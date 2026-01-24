@@ -15,7 +15,7 @@ const userDao = {
                 err.code = 'USER_EXIST';
                 throw err;
             }
-            throw error;
+            throw error
         }
     }
 };
