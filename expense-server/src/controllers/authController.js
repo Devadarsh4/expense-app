@@ -86,7 +86,7 @@ const authController = {
             }
 
             return response.status(500).json({
-                message: 'Server error'
+                message: 'Server error
             });
         }
     }
