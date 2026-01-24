@@ -1,17 +1,14 @@
 {
     "name": "expense-server",
     "version": "1.0.0",
-    "description": "",
-    "main": "server.js",
+    "type": "commonjs",
+    "license": "ISC",
     "scripts": {
-        "test": "echo \"Error: no test specified\" && exit 1",
         "start": "node server.js"
     },
-    "keywords": [],
-    "author": "",
-    "license": "ISC",
-    "type": "commonjs",
     "dependencies": {
-        "express": "^5.2.1"
+        "dotenv": "^17.2.3",
+        "express": "^5.2.1",
+        "mongoose": "^9.1.5"
     }
 }

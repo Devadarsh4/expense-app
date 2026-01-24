@@ -1,42 +1,10 @@
-// let users = []; // temporary in-memory storage
-const users = require('../dao/userDb');
+const userDao = require('../dao/userDao');
+
+
 
 const authController = {
-    register: (request, response) => {
-        const { name, email, password } = request.body;
-
-        if (!name || !email || !password) {
-            return response.status(400).json({
-                message: 'Name, Email, Password are required'
-            });
-        }
-
-        const existingUser = users.find(user => user.email === email);
-
-        if (existingUser) {
-            return response.status(409).json({
-                message: 'Email already registered'
-            });
-        }
-
-        const newUser = {
-            id: users.length + 1,
-            name,
-            email,
-            password
-        };
-
-        users.push(newUser);
-
-        return response.status(200).json({
-            message: 'User registered',
-            user: {
-                id: newUser.id
-            }
-        });
-    },
-
-    login: (request, response) => {
+    // LOGIN
+    login: async(request, response) => {
         const { email, password } = request.body;
 
         if (!email || !password) {
@@ -45,24 +13,60 @@ const authController = {
             });
         }
 
-        const user = users.find(
-            user => user.email === email && user.password === password
-        );
+        const user = await userDao.findByEmail(email);
 
-        if (!user) {
-            return response.status(400).json({
-                message: 'Invalid email or password'
+        if (user && user.password === password) {
+            return response.status(200).json({
+                message: 'User authenticated',
+                user: {
+                    id: user._id,
+                    name: user.name,
+                    email: user.email
+                }
             });
         }
 
-        return response.status(200).json({
-            message: 'Login successful',
-            user: {
-                id: user.id,
-                name: user.name,
-                email: user.email
-            }
+        return response.status(401).json({
+            message: 'Invalid email or password'
         });
+    },
+
+    // REGISTER
+    register: async(request, response) => {
+        const { name, email, password } = request.body;
+
+        if (!name || !email || !password) {
+            return response.status(400).json({
+                message: 'Name, Email, Password are required'
+            });
+        }
+
+        try {
+            const newUser = await userDao.create({
+                name,
+                email,
+                password
+            });
+
+            return response.status(201).json({
+                message: 'User registered',
+                user: {
+                    id: newUser._id,
+                    name: newUser.name,
+                    email: newUser.email
+                }
+            });
+        } catch (error) {
+            if (error.code === 'USER_EXIST') {
+                return response.status(400).json({
+                    message: 'Email already registered'
+                });
+            }
+
+            return response.status(500).json({
+                message: 'Server error'
+            });
+        }
     }
 };
 
