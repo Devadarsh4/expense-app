@@ -1,21 +1,50 @@
 const groupDao = require("../dao/groupDao");
 
-exports.createGroup = async(req, res) => {
-    try {
-        const group = await groupDao.createGroup(req.body);
-        res.status(201).json(group);
-    } catch (error) {
-        res.status(500).json({ message: "Error creating group" });
+const groupController = {
+
+    create: async(request, response) => {
+        try {
+            const user = request.user;
+
+            const {
+                name,
+                description,
+                membersEmail,
+                thumbnail
+            } = request.body;
+
+            let allMembers = [user.email];
+
+            if (membersEmail && Array.isArray(membersEmail)) {
+                allMembers = [...new Set([...allMembers, ...membersEmail])];
+            }
+
+            const newGroup = await groupDao.createGroup({
+                name,
+                description,
+                adminEmail: user.email,
+                membersEmail: allMembers,
+                thumbnail,
+                paymentStatus: {
+                    amount: 0,
+                    currency: 'INR',
+                    date: Date.now(),
+                    isPaid: false
+                }
+            });
+
+            response.status(200).json({
+                message: "Group created",
+                groupId: newGroup._id
+            });
+
+        } catch (error) {
+            console.log(error);
+            response.status(500).json({
+                message: "Internal server error"
+            });
+        }
     }
 };
 
-exports.addMembers = async(req, res) => {
-    const { groupId, members } = req.body;
-    const group = await groupDao.addMembers(groupId, ...members);
-    res.json(group);
-};
-
-exports.getGroupByEmail = async(req, res) => {
-    const groups = await groupDao.getGroupByEmail(req.params.email);
-    res.json(groups);
-};
+module.exports = groupController;

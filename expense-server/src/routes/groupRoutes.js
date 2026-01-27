@@ -1,9 +1,9 @@
-const express = require("express");
-const router = express.Router();
-const groupController = require("../controllers/groupController");
+const express = require('express');
+const groupController = require('../controllers/groupController');
+const authMiddleware = require('../middlewares/authMiddleware');
 
-router.post("/create", groupController.createGroup);
-router.post("/add-members", groupController.addMembers);
-router.get("/:email", groupController.getGroupByEmail);
+const router = express.Router();
+
+router.post('/create', authMiddleware, groupController.create);
 
 module.exports = router;
