@@ -24,7 +24,8 @@ const groupController = {
                     date: Date.now(),
                     isPaid: false
                 }
-            })
+            });
+
             res.status(201).json({ message: 'Group created', group });
         } catch (error) {
             res.status(500).json({ message: 'Internal server error' });
