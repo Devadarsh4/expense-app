@@ -9,21 +9,27 @@ const groupRoutes = require('./src/routes/groupRoutes');
 
 const app = express();
 
+/* ---------- MIDDLEWARE ---------- */
 app.use(cors({
-    origin: 'http://localhost:3000',
+    origin: 'http://localhost:5173', // Vite frontend
     credentials: true
 }));
 
 app.use(express.json());
 app.use(cookieParser());
 
+/* ---------- ROUTES ---------- */
 app.use('/auth', authRoutes);
 app.use('/groups', groupRoutes);
 
+/* ---------- DATABASE ---------- */
 mongoose.connect(process.env.MONGO_DB_CONNECTION_URI)
     .then(() => console.log('MongoDB Connected'))
-    .catch(err => console.log(err));
+    .catch((error) => {
+        console.error('Error connecting to database:', error);
+    });
 
+/* ---------- SERVER ---------- */
 app.listen(5001, () => {
     console.log('Server is running on port 5001');
 });
