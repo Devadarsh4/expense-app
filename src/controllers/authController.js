@@ -1,31 +1,34 @@
-const { OAuth2Client } = require("google-auth-library");
-const userDao = require("../dao/userDao");
+const jwt = require("jsonwebtoken");
 
-const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+const authController = {
+    isUserLoggedIn: async(req, res) => {
+        try {
+            const token = req.cookies ? .token; // ✅ FIXED
 
-exports.googleAuth = async(req, res) => {
-    try {
-        const { idToken } = req.body;
+            if (!token) {
+                return res.status(401).json({ message: "Unauthorized" });
+            }
 
-        const ticket = await client.verifyIdToken({
-            idToken,
-            audience: process.env.GOOGLE_CLIENT_ID
-        });
+            jwt.verify(token, process.env.JWT_SECRET, (err, decoded) => {
+                if (err) {
+                    return res.status(401).json({ message: "Invalid token" });
+                }
 
-        const { email, name } = ticket.getPayload();
-
-        let user = await userDao.findByEmail(email);
-
-        if (!user) {
-            user = await userDao.createUser({
-                email,
-                name,
-                password: "GOOGLE_AUTH"
+                res.json({
+                    user: {
+                        id: decoded.userId,
+                    },
+                });
             });
+        } catch (error) {
+            res.status(500).json({ message: "Internal server error" });
         }
+    },
 
-        res.status(200).json({ user });
-    } catch (error) {
-        res.status(401).json({ message: "Google login failed" });
-    }
+    logout: async(req, res) => {
+        res.clearCookie("token"); // ✅ SAME NAME
+        res.json({ message: "Logout successful" });
+    },
 };
+
+module.exports = authController;
