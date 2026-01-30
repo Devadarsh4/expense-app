@@ -3,7 +3,8 @@ const jwt = require("jsonwebtoken");
 const authController = {
     isUserLoggedIn: async(req, res) => {
         try {
-            const token = req.cookies ? .token; // ✅ FIXED
+            const token = req.cookies && req.cookies.token;
+
 
             if (!token) {
                 return res.status(401).json({ message: "Unauthorized" });
