@@ -27,8 +27,21 @@ const authController = {
     },
 
     logout: async(req, res) => {
-        res.clearCookie("token"); // ✅ SAME NAME
+        res.clearCookie("token");
         res.json({ message: "Logout successful" });
+    },
+    googleSso: async(request, response) => {
+        try {
+            const { id oken } = request.body;
+            if (!idToken) {
+                return response.status(401).json({ message: "Invalid" });
+            }
+        } catch (error) {
+            console.log(error);
+            return response.status(500).json({
+                message: 'internal server error'
+            });
+        }
     },
 };
 
