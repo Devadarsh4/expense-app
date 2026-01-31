@@ -1,0 +1,33 @@
+const nodemailer = require("nodemailer");
+
+/* ================= CREATE TRANSPORT ================= */
+const emailClient = nodemailer.createTransport({
+    service: "gmail",
+    auth: {
+        user: process.env.GOOGLE_EMAIL,
+        pass: process.env.GOOGLE_APP_PASSWORD,
+    },
+});
+
+/* ================= EMAIL SERVICE ================= */
+const emailServices = {
+    send: async(to, subject, body) => {
+        try {
+            const emailOptions = {
+                from: process.env.GOOGLE_EMAIL,
+                to: to,
+                subject: subject,
+                text: body, // use "html" if you want HTML
+            };
+
+            const info = await emailClient.sendMail(emailOptions);
+            console.log("Email sent:", info.messageId);
+            return info;
+        } catch (error) {
+            console.error("Email send failed:", error);
+            throw error;
+        }
+    },
+};
+
+module.exports = emailServices;
