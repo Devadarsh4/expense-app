@@ -2,8 +2,12 @@ const express = require("express");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const User = require("../model/User");
+const authController = require("../controllers/authController");
 
 const router = express.Router();
+
+/* ================= GOOGLE AUTH ================= */
+router.post("/google-auth", authController.googleSso);
 
 /* ================= REGISTER ================= */
 router.post("/register", async(req, res) => {
@@ -29,7 +33,7 @@ router.post("/register", async(req, res) => {
         await user.save();
 
         // ✅ Issue JWT on register (auto-login)
-        const token = jwt.sign({ userId: user._id },
+        const token = jwt.sign({ userId: user._id, email: user.email },
             process.env.JWT_SECRET, { expiresIn: "1d" }
         );
 
@@ -70,7 +74,7 @@ router.post("/login", async(req, res) => {
             return res.status(401).json({ message: "Invalid password" });
         }
 
-        const token = jwt.sign({ userId: user._id },
+        const token = jwt.sign({ userId: user._id, email: user.email },
             process.env.JWT_SECRET, { expiresIn: "1d" }
         );
 
@@ -93,7 +97,7 @@ router.post("/login", async(req, res) => {
 });
 
 /* ================= IS USER LOGGED IN ================= */
-router.post("/is-user-loggedin", (req, res) => {
+router.post("/is-user-logged-in", (req, res) => {
     try {
         const token = req.cookies && req.cookies.token;
 
@@ -109,6 +113,7 @@ router.post("/is-user-loggedin", (req, res) => {
             res.json({
                 user: {
                     id: decoded.userId,
+                    email: decoded.email,
                 },
             });
         });
