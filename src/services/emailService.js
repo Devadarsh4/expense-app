@@ -9,7 +9,7 @@ const emailClient = nodemailer.createTransport({
     },
 });
 
-/* ================= EMAIL SERVICE ================= */
+
 const emailServices = {
     send: async(to, subject, body) => {
         try {
@@ -17,7 +17,7 @@ const emailServices = {
                 from: process.env.GOOGLE_EMAIL,
                 to: to,
                 subject: subject,
-                text: body, // use "html" if you want HTML
+                text: body,
             };
 
             const info = await emailClient.sendMail(emailOptions);
