@@ -6,9 +6,28 @@ const User = require("../model/User");
 
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
-const authController = {
+/* ================= TOKEN HELPERS ================= */
+const generateAccessToken = (user) =>
+    jwt.sign({ userId: user._id, email: user.email },
+        process.env.JWT_SECRET, { expiresIn: "1h" }
+    );
 
-    /* ================= REGISTER ================= */
+const generateRefreshToken = (user) =>
+    jwt.sign({ userId: user._id },
+        process.env.REFRESH_SECRET, { expiresIn: "7d" }
+    );
+
+/* ================= COOKIE OPTIONS ================= */
+const cookieOptions = {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    path: "/", // 🔥 VERY IMPORTANT
+};
+
+/* ================= CONTROLLER ================= */
+const authController = {
+    /* ===== REGISTER ===== */
     register: async(req, res) => {
         try {
             const { email, password } = req.body;
@@ -23,47 +42,35 @@ const authController = {
             }
 
             const hashedPassword = await bcrypt.hash(password, 10);
+            const user = await User.create({ email, password: hashedPassword });
 
-            const user = await User.create({
-                email,
-                password: hashedPassword,
-            });
+            const accessToken = generateAccessToken(user);
+            const refreshToken = generateRefreshToken(user);
 
-            const token = jwt.sign({ userId: user._id, email: user.email },
-                process.env.JWT_SECRET, { expiresIn: "1d" }
-            );
+            res.cookie("accessToken", accessToken, cookieOptions);
+            res.cookie("refreshToken", refreshToken, cookieOptions);
 
-            res.cookie("token", token, {
-                httpOnly: true,
-                sameSite: "lax",
-                secure: process.env.NODE_ENV === "production",
-            });
-
-            return res.status(201).json({
+            res.status(201).json({
                 message: "Registration successful",
-                user: {
-                    id: user._id,
-                    email: user.email,
-                },
+                user: { id: user._id, email: user.email },
             });
-        } catch (error) {
-            console.error("Register error:", error);
-            return res.status(500).json({ message: "Register failed" });
+        } catch (err) {
+            console.error("Register error:", err);
+            res.status(500).json({ message: "Register failed" });
         }
     },
 
-    /* ================= LOGIN ================= */
+    /* ===== LOGIN ===== */
     login: async(req, res) => {
         try {
-            // ✅ express-validator result
             const errors = validationResult(req);
             if (!errors.isEmpty()) {
                 return res.status(400).json({ errors: errors.array() });
             }
 
             const { email, password } = req.body;
-
             const user = await User.findOne({ email });
+
             if (!user) {
                 return res.status(401).json({ message: "User not found" });
             }
@@ -73,119 +80,106 @@ const authController = {
                 return res.status(401).json({ message: "Invalid password" });
             }
 
-            const token = jwt.sign({ userId: user._id, email: user.email },
-                process.env.JWT_SECRET, { expiresIn: "1d" }
-            );
+            const accessToken = generateAccessToken(user);
+            const refreshToken = generateRefreshToken(user);
 
-            res.cookie("token", token, {
-                httpOnly: true,
-                sameSite: "lax",
-                secure: process.env.NODE_ENV === "production",
-            });
+            res.cookie("accessToken", accessToken, cookieOptions);
+            res.cookie("refreshToken", refreshToken, cookieOptions);
 
-            return res.json({
+            res.json({
                 message: "Login successful",
-                user: {
-                    id: user._id,
-                    email: user.email,
-                },
+                user: { id: user._id, email: user.email },
             });
-        } catch (error) {
-            console.error("Login error:", error);
-            return res.status(500).json({ message: "Login failed" });
+        } catch (err) {
+            console.error("Login error:", err);
+            res.status(500).json({ message: "Login failed" });
         }
     },
 
-    /* ================= IS USER LOGGED IN ================= */
+    /* ===== IS USER LOGGED IN ===== */
     isUserLoggedIn: async(req, res) => {
-        try {
-            const token = req.cookies && req.cookies.token;
+        const { accessToken, refreshToken } = req.cookies;
 
-            if (!token) {
+        try {
+            // 1️⃣ Verify access token
+            if (accessToken) {
+                try {
+                    const decoded = jwt.verify(accessToken, process.env.JWT_SECRET);
+                    return res.json({
+                        user: { id: decoded.userId, email: decoded.email },
+                    });
+                } catch (err) {
+                    if (err.name !== "TokenExpiredError") {
+                        throw err;
+                    }
+                }
+            }
+
+            // 2️⃣ Use refresh token
+            if (!refreshToken) {
                 return res.status(401).json({ message: "Unauthorized" });
             }
 
-            const decoded = jwt.verify(token, process.env.JWT_SECRET);
+            const decodedRefresh = jwt.verify(
+                refreshToken,
+                process.env.REFRESH_SECRET
+            );
+
+            const user = await User.findById(decodedRefresh.userId);
+            if (!user) {
+                return res.status(401).json({ message: "Unauthorized" });
+            }
+
+            const newAccessToken = generateAccessToken(user);
+            res.cookie("accessToken", newAccessToken, cookieOptions);
 
             return res.json({
-                user: {
-                    id: decoded.userId,
-                    email: decoded.email,
-                },
+                user: { id: user._id, email: user.email },
             });
-        } catch (error) {
-            console.error("JWT verify error:", error);
-            return res.status(401).json({ message: "Invalid token" });
+        } catch (err) {
+            console.error("Auth check error:", err);
+            return res.status(401).json({ message: "Unauthorized" });
         }
     },
 
-    /* ================= LOGOUT ================= */
+    /* ===== LOGOUT (🔥 FIXED) ===== */
     logout: async(req, res) => {
-        res.clearCookie("token", {
-            httpOnly: true,
-            sameSite: "lax",
-            secure: process.env.NODE_ENV === "production",
-        });
+        res.clearCookie("accessToken", cookieOptions);
+        res.clearCookie("refreshToken", cookieOptions);
 
-        return res.json({ message: "Logout successful" });
+        return res.status(200).json({ message: "Logout successful" });
     },
 
-    /* ================= GOOGLE SSO ================= */
+    /* ===== GOOGLE SSO ===== */
     googleSso: async(req, res) => {
         try {
             const { idToken } = req.body;
-
-            if (!idToken) {
-                return res.status(400).json({ message: "Google token missing" });
-            }
 
             const ticket = await googleClient.verifyIdToken({
                 idToken,
                 audience: process.env.GOOGLE_CLIENT_ID,
             });
 
-            const payload = ticket.getPayload();
-            if (!payload) {
-                return res.status(401).json({ message: "Invalid Google token" });
-            }
-
-            const { sub: googleId, email, name } = payload;
-
-            if (!email) {
-                return res.status(401).json({ message: "Google authentication failed" });
-            }
+            const { email, name, sub: googleId } = ticket.getPayload();
 
             let user = await User.findOne({ email });
-
             if (!user) {
-                user = await User.create({
-                    email,
-                    name: name || "",
-                    googleId,
-                });
+                user = await User.create({ email, name, googleId });
             }
 
-            const token = jwt.sign({ userId: user._id, email: user.email },
-                process.env.JWT_SECRET, { expiresIn: "1d" }
-            );
+            const accessToken = generateAccessToken(user);
+            const refreshToken = generateRefreshToken(user);
 
-            res.cookie("token", token, {
-                httpOnly: true,
-                sameSite: "lax",
-                secure: process.env.NODE_ENV === "production",
-            });
+            res.cookie("accessToken", accessToken, cookieOptions);
+            res.cookie("refreshToken", refreshToken, cookieOptions);
 
-            return res.json({
+            res.json({
                 message: "Google login successful",
-                user: {
-                    id: user._id,
-                    email: user.email,
-                    name: user.name,
-                },
+                user: { id: user._id, email: user.email, name: user.name },
             });
-        } catch (error) {
-            console.error("Google SSO error:", error);
-            return res.status(401).json({ message: "Google authentication failed" });
+        } catch (err) {
+            console.error("Google SSO error:", err);
+            res.status(401).json({ message: "Google authentication failed" });
         }
     },
 };
