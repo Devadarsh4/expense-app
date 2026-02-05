@@ -4,11 +4,14 @@ const userSchema = new mongoose.Schema({
     email: {
         type: String,
         required: true,
-        unique: true
+        unique: true,
+        lowercase: true,
+        trim: true
     },
 
     name: {
-        type: String
+        type: String,
+        trim: true
     },
 
     password: {
@@ -21,9 +24,21 @@ const userSchema = new mongoose.Schema({
         required: false
     },
 
+    // ✅ FIXED RBAC FIELD
+    role: {
+        type: String,
+        enum: ["admin", "manager", "user"],
+        default: "user",
+        required: true
+    },
 
-    role: { type: String, required: true },
-    adminId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', index: true }
-});
+    // ✅ Only for users created by admin
+    adminId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+        default: null,
+        index: true
+    }
+}, { timestamps: true });
 
 module.exports = mongoose.model("User", userSchema);
