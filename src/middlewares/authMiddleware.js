@@ -1,19 +1,26 @@
-const jwt = require('jsonwebtoken');
+const permissions = require("../utility/permissions");
 
-function authMiddleware(req, res, next) {
-    try {
-        if (!req.cookies || !req.cookies.jwtToken) {
-            return res.status(401).json({ message: 'Unauthorized' });
+const authorize = (requiredPermission) => {
+    return (req, res, next) => {
+        // Auth middleware must run before this
+        const user = req.user;
+
+        if (!user) {
+            return res.status(401).json({
+                message: "Unauthorized access"
+            });
         }
 
-        const token = req.cookies.jwtToken;
-        const user = jwt.verify(token, process.env.JWT_SECRET);
+        const userPermissions = permissions[user.role] || [];
 
-        req.user = user;
+        if (!userPermissions.includes(requiredPermission)) {
+            return res.status(403).json({
+                message: "Forbidden: Insufficient permissions"
+            });
+        }
+
         next();
-    } catch (error) {
-        return res.status(401).json({ message: 'Unauthorized' });
-    }
-}
+    };
+};
 
-module.exports = authMiddleware;
+module.exports = authorize;
