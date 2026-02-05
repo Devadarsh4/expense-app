@@ -14,11 +14,11 @@ const generateTemporaryPassword = () => {
 const rbacDao = {
     create: async(userData) {
         const user = await User.create({
-            email: userData.email,
-            password: userData.password,
-            name: userData.name,
-            role: userData.role,
-            adminId: userData.Id
+            email: email,
+            password: generateTemporaryPassword(6),
+            name: name,
+            role: role,
+            adminId: adminIdId
         });
     },
 
