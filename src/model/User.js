@@ -24,15 +24,15 @@ const userSchema = new mongoose.Schema({
         required: false
     },
 
-    // ✅ FIXED RBAC FIELD
+    // FIXED RBAC FIELD
     role: {
         type: String,
-        enum: ["admin", "manager", "user"],
-        default: "user",
+        enum: ["admin", "manager", "viewer"],
+        default: "viewer",
         required: true
     },
 
-    // ✅ Only for users created by admin
+    // Only for users created by admin
     adminId: {
         type: mongoose.Schema.Types.ObjectId,
         ref: "User",

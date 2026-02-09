@@ -1,6 +1,6 @@
 const nodemailer = require("nodemailer");
 
-/* ================= CREATE TRANSPORT ================= */
+
 const emailClient = nodemailer.createTransport({
     service: "gmail",
     auth: {
@@ -11,7 +11,7 @@ const emailClient = nodemailer.createTransport({
 
 
 const emailServices = {
-    send: async(to, subject, body) => {
+    send: async (to, subject, body) => {
         try {
             const emailOptions = {
                 from: process.env.GOOGLE_EMAIL,

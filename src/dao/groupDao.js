@@ -3,14 +3,14 @@ const Group = require('../model/group');
 /**
  * Create group
  */
-const createGroup = async(groupData) => {
+const createGroup = async (groupData) => {
     return await Group.create(groupData);
 };
 
 /**
  * Update group details
  */
-const updateGroup = async(groupId, updateData) => {
+const updateGroup = async (groupId, updateData) => {
     return await Group.findByIdAndUpdate(
         groupId,
         updateData, { new: true }
@@ -20,16 +20,16 @@ const updateGroup = async(groupId, updateData) => {
 /**
  * Add members to group
  */
-const addMembers = async(groupId, members) => {
+const addMembers = async (groupId, members) => {
     return await Group.findByIdAndUpdate(
         groupId, { $addToSet: { membersEmail: { $each: members } } }, { new: true }
     );
 };
 
 /**
- * Remove members from group ✅
+ * Remove members from group
  */
-const removeMembers = async(groupId, members) => {
+const removeMembers = async (groupId, members) => {
     return await Group.findByIdAndUpdate(
         groupId, { $pull: { membersEmail: { $in: members } } }, { new: true }
     );
@@ -38,25 +38,25 @@ const removeMembers = async(groupId, members) => {
 /**
  * Get groups by user email
  */
-const getGroupByEmail = async(email) => {
+const getGroupByEmail = async (email) => {
     return await Group.find({
         membersEmail: email
     });
 };
 
 /**
- * Get groups by payment status ✅
+ * Get groups by payment status
  */
-const getGroupByStatus = async(status) => {
+const getGroupByStatus = async (status) => {
     return await Group.find({
         'paymentStatus.isPaid': status
     });
 };
 
 /**
- * Get audit log (simple example) ✅
+ * Get audit log (simple example)
  */
-const getAuditLog = async(groupId) => {
+const getAuditLog = async (groupId) => {
     const group = await Group.findById(groupId);
     if (!group) return null;
 
@@ -76,5 +76,23 @@ module.exports = {
     removeMembers,
     getGroupByEmail,
     getGroupByStatus,
-    getAuditLog
+    getAuditLog,
+    getGroupsPaginated: async (email, limit, skip) => {
+        const [groups, totalCount] = await Promise.all([
+            // Find groups with given email, 
+            // sort them to preserve order across 
+            // pagination requests, and then perform 
+            // skip and limit to get results of desired page.
+            Group.find({ membersEmail: email })
+                .sort({ createdAt: -1 })
+                .skip(skip)
+                .limit(limit),
+
+            // Count how many records are there in the collection
+            // with the given email
+            Group.countDocuments({ membersEmail: email }),
+        ]);
+
+        return { groups, totalCount };
+    },
 };

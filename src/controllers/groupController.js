@@ -2,7 +2,7 @@ const groupDao = require('../dao/groupDao');
 
 const groupController = {
 
-    create: async(req, res) => {
+    create: async (req, res) => {
         try {
             const user = req.user;
             const { name, description, membersEmail, thumbnail } = req.body;
@@ -32,7 +32,30 @@ const groupController = {
         }
     },
 
-    updateGroup: async(req, res) => {
+    getMyGroups: async (req, res) => {
+        try {
+            const email = req.user.email;
+            const page = parseInt(req.query.page) || 1;
+            const limit = parseInt(req.query.limit) || 10;
+            const skip = (page - 1) * limit;
+
+            const { groups, totalCount } = await groupDao.getGroupsPaginated(email, limit, skip);
+
+            res.status(200).json({
+                groups: groups,
+                pagination: {
+                    totalItems: totalCount,
+                    totalPages: Math.ceil(totalCount / limit),
+                    currentPage: page,
+                    itemsPerPage: limit
+                }
+            });
+        } catch (error) {
+            res.status(500).json({ message: 'Failed to fetch groups' });
+        }
+    },
+
+    updateGroup: async (req, res) => {
         try {
             const { groupId } = req.params;
             const updatedGroup = await groupDao.updateGroup(groupId, req.body);
@@ -42,7 +65,7 @@ const groupController = {
         }
     },
 
-    addMembers: async(req, res) => {
+    addMembers: async (req, res) => {
         try {
             const { groupId } = req.params;
             const { members } = req.body;
@@ -53,7 +76,7 @@ const groupController = {
         }
     },
 
-    removeMembers: async(req, res) => {
+    removeMembers: async (req, res) => {
         try {
             const { groupId } = req.params;
             const { members } = req.body;
@@ -64,7 +87,7 @@ const groupController = {
         }
     },
 
-    getGroupByEmail: async(req, res) => {
+    getGroupByEmail: async (req, res) => {
         try {
             const { email } = req.params;
             const groups = await groupDao.getGroupByEmail(email);
@@ -74,7 +97,7 @@ const groupController = {
         }
     },
 
-    getGroupByStatus: async(req, res) => {
+    getGroupByStatus: async (req, res) => {
         try {
             const { status } = req.params;
             const groups = await groupDao.getGroupByStatus(status === 'true');
@@ -84,7 +107,7 @@ const groupController = {
         }
     },
 
-    getAuditLog: async(req, res) => {
+    getAuditLog: async (req, res) => {
         try {
             const { groupId } = req.params;
             const audit = await groupDao.getAuditLog(groupId);

@@ -1,20 +1,21 @@
 const express = require('express');
 const groupController = require('../controllers/groupController');
-const authMiddleware = require('../middlewares/authMiddleware');
+const { protect, authorize } = require('../middlewares/authMiddleware');
 
 const router = express.Router();
 
 /* Protected routes */
-router.use(authMiddleware);
+router.use(protect);
 
 /* Group APIs */
-router.post('/create', groupController.create);
-router.put('/update/:groupId', groupController.updateGroup);
-router.put('/add-members/:groupId', groupController.addMembers);
-router.put('/remove-members/:groupId', groupController.removeMembers);
+router.get('/my-groups', authorize('group:view'), groupController.getMyGroups);
+router.post('/create', authorize('group:create'), groupController.create);
+router.put('/update/:groupId', authorize('group:update'), groupController.updateGroup);
+router.put('/add-members/:groupId', authorize('group:update'), groupController.addMembers);
+router.put('/remove-members/:groupId', authorize('group:update'), groupController.removeMembers);
 
-router.get('/by-email/:email', groupController.getGroupByEmail);
-router.get('/by-status/:status', groupController.getGroupByStatus);
-router.get('/audit/:groupId', groupController.getAuditLog);
+router.get('/by-email/:email', authorize('group:view'), groupController.getGroupByEmail);
+router.get('/by-status/:status', authorize('group:view'), groupController.getGroupByStatus);
+router.get('/audit/:groupId', authorize('group:view'), groupController.getAuditLog);
 
 module.exports = router;

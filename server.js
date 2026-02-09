@@ -1,4 +1,5 @@
 require("dotenv").config();
+
 const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
@@ -6,43 +7,38 @@ const cookieParser = require("cookie-parser");
 
 const authRoutes = require("./src/routes/authRoutes");
 const groupRoutes = require("./src/routes/groupRoutes");
-const rbacRoutes = require('./src/routes/rbacRoutes');
+const rbacRoutes = require("./src/routes/rbacRoutes");
 
 const app = express();
 
-/* ================= MIDDLEWARE ================= */
 app.use(
     cors({
-        origin: "http://localhost:5173", // Vite frontend
-        credentials: true, // allow cookies
+        origin: ["http://localhost:5173", "http://localhost:5174"],
+        credentials: true,
     })
 );
 
 app.use(express.json());
 app.use(cookieParser());
 
-/* ================= ROUTES ================= */
 app.use("/auth", authRoutes);
 app.use("/groups", groupRoutes);
-app.use('/users', rbacRoutes);
+app.use("/users", rbacRoutes);
 
-/* ================= DATABASE ================= */
 mongoose
     .connect(process.env.MONGO_DB_CONNECTION_URI)
-    .then(() => console.log("✅ MongoDB Connected"))
+    .then(() => console.log("MongoDB Connected"))
     .catch((error) => {
-        console.error("❌ MongoDB connection error:", error);
+        console.error(error);
         process.exit(1);
     });
 
-/* ================= HEALTH CHECK ================= */
 app.get("/", (req, res) => {
     res.json({ message: "Expense App API is running" });
 });
 
-/* ================= SERVER ================= */
 const PORT = process.env.PORT || 5001;
 
 app.listen(PORT, () => {
-    console.log(`🚀 Server running on port ${PORT}`);
+    console.log(`Server is running on port ${PORT}`);
 });

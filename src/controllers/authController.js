@@ -3,21 +3,42 @@ const jwt = require("jsonwebtoken");
 const { OAuth2Client } = require("google-auth-library");
 const { validationResult } = require("express-validator");
 const User = require("../model/User");
+const userDao = require("../dao/userDao");
+const { ADMIN_ROLE, VIEWER_ROLE, USER_ROLES } = require("../utility/userRoles");
 
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
-/* ================= TOKEN HELPERS ================= */
-const generateAccessToken = (user) =>
-    jwt.sign({ userId: user._id, email: user.email },
-        process.env.JWT_SECRET, { expiresIn: "1h" }
-    );
+const generateAccessToken = (user) => {
+    let role = user.role;
+    if (!USER_ROLES.includes(role)) {
+        role = VIEWER_ROLE;
+    }
 
-const generateRefreshToken = (user) =>
-    jwt.sign({ userId: user._id },
-        process.env.REFRESH_SECRET, { expiresIn: "7d" }
-    );
+    return jwt.sign({
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        role: role,
+        adminId: user.adminId ? user.adminId : user._id,
+    },
+        process.env.JWT_SECRET, { expiresIn: "1h" });
+};
 
-/* ================= COOKIE OPTIONS ================= */
+const generateRefreshToken = (user) => {
+    let role = user.role;
+    if (!USER_ROLES.includes(role)) {
+        role = VIEWER_ROLE;
+    }
+
+    return jwt.sign({
+        _id: user._id,
+        role: role,
+        adminId: user.adminId ? user.adminId : user._id,
+    },
+        process.env.REFRESH_SECRET, { expiresIn: "7d" });
+};
+
+
 const cookieOptions = {
     httpOnly: true,
     sameSite: "lax",
@@ -25,10 +46,10 @@ const cookieOptions = {
     path: "/", // 🔥 VERY IMPORTANT
 };
 
-/* ================= CONTROLLER ================= */
+
 const authController = {
-    /* ===== REGISTER ===== */
-    register: async(req, res) => {
+
+    register: async (req, res) => {
         try {
             const { email, password } = req.body;
 
@@ -42,7 +63,7 @@ const authController = {
             }
 
             const hashedPassword = await bcrypt.hash(password, 10);
-            const user = await User.create({ email, password: hashedPassword });
+            const user = await User.create({ email, password: hashedPassword, role: ADMIN_ROLE });
 
             const accessToken = generateAccessToken(user);
             const refreshToken = generateRefreshToken(user);
@@ -60,8 +81,8 @@ const authController = {
         }
     },
 
-    /* ===== LOGIN ===== */
-    login: async(req, res) => {
+
+    login: async (req, res) => {
         try {
             const errors = validationResult(req);
             if (!errors.isEmpty()) {
@@ -69,35 +90,34 @@ const authController = {
             }
 
             const { email, password } = req.body;
-            const user = await User.findOne({ email });
+            const user = await userDao.findByEmail(email);
 
-            if (!user) {
-                return res.status(401).json({ message: "User not found" });
+            const isMatch = await bcrypt.compare(password, user?.password);
+            if (user && isMatch) {
+                user.role = user.role ? user.role : ADMIN_ROLE;
+                user.adminId = user.adminId ? user.adminId : user._id;
+
+                const accessToken = generateAccessToken(user);
+                const refreshToken = generateRefreshToken(user);
+
+                res.cookie("accessToken", accessToken, cookieOptions);
+                res.cookie("refreshToken", refreshToken, cookieOptions);
+
+                res.json({
+                    message: "Login successful",
+                    user: { id: user._id, email: user.email, name: user.name, role: user.role },
+                });
+            } else {
+                return res.status(401).json({ message: "Invalid email or password" });
             }
-
-            const isMatch = await bcrypt.compare(password, user.password);
-            if (!isMatch) {
-                return res.status(401).json({ message: "Invalid password" });
-            }
-
-            const accessToken = generateAccessToken(user);
-            const refreshToken = generateRefreshToken(user);
-
-            res.cookie("accessToken", accessToken, cookieOptions);
-            res.cookie("refreshToken", refreshToken, cookieOptions);
-
-            res.json({
-                message: "Login successful",
-                user: { id: user._id, email: user.email },
-            });
         } catch (err) {
             console.error("Login error:", err);
             res.status(500).json({ message: "Login failed" });
         }
     },
 
-    /* ===== IS USER LOGGED IN ===== */
-    isUserLoggedIn: async(req, res) => {
+
+    isUserLoggedIn: async (req, res) => {
         const { accessToken, refreshToken } = req.cookies;
 
         try {
@@ -105,8 +125,9 @@ const authController = {
             if (accessToken) {
                 try {
                     const decoded = jwt.verify(accessToken, process.env.JWT_SECRET);
+                    const userId = decoded._id || decoded.userId;
                     return res.json({
-                        user: { id: decoded.userId, email: decoded.email },
+                        user: { id: userId, email: decoded.email, role: decoded.role },
                     });
                 } catch (err) {
                     if (err.name !== "TokenExpiredError") {
@@ -125,7 +146,8 @@ const authController = {
                 process.env.REFRESH_SECRET
             );
 
-            const user = await User.findById(decodedRefresh.userId);
+            const userId = decodedRefresh._id || decodedRefresh.userId;
+            const user = await User.findById(userId);
             if (!user) {
                 return res.status(401).json({ message: "Unauthorized" });
             }
@@ -134,7 +156,7 @@ const authController = {
             res.cookie("accessToken", newAccessToken, cookieOptions);
 
             return res.json({
-                user: { id: user._id, email: user.email },
+                user: { id: user._id, email: user.email, name: user.name, role: user.role },
             });
         } catch (err) {
             console.error("Auth check error:", err);
@@ -142,16 +164,16 @@ const authController = {
         }
     },
 
-    /* ===== LOGOUT (🔥 FIXED) ===== */
-    logout: async(req, res) => {
+
+    logout: async (req, res) => {
         res.clearCookie("accessToken", cookieOptions);
         res.clearCookie("refreshToken", cookieOptions);
 
         return res.status(200).json({ message: "Logout successful" });
     },
 
-    /* ===== GOOGLE SSO ===== */
-    googleSso: async(req, res) => {
+
+    googleSso: async (req, res) => {
         try {
             const { idToken } = req.body;
 
@@ -164,7 +186,7 @@ const authController = {
 
             let user = await User.findOne({ email });
             if (!user) {
-                user = await User.create({ email, name, googleId });
+                user = await User.create({ email, name, googleId, role: ADMIN_ROLE });
             }
 
             const accessToken = generateAccessToken(user);
@@ -175,7 +197,7 @@ const authController = {
 
             res.json({
                 message: "Google login successful",
-                user: { id: user._id, email: user.email, name: user.name },
+                user: { id: user._id, email: user.email, name: user.name, role: user.role },
             });
         } catch (err) {
             console.error("Google SSO error:", err);

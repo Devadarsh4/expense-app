@@ -1,46 +1,31 @@
-const User = require("../model/users");
+const User = require('../model/User');
 
 const rbacDao = {
-
-    // CREATE USER (DB only)
-    create: async(email, name, role, password, adminId) => {
-
-        // Prevent duplicate user
-        const existingUser = await User.findOne({ email });
-        if (existingUser) {
-            throw new Error("User already exists");
-        }
-
-        const user = await User.create({
-            email,
-            password, // already hashed
-            name,
-            role,
-            adminId
+    create: async (email, name, role, password, adminId) => {
+        return await User.create({
+            email: email,
+            password: password,
+            name: name,
+            role: role,
+            adminId: adminId
         });
-
-        // Hide password before returning
-        user.password = undefined;
-
-        return user;
     },
 
-    // UPDATE USER
-    update: async(userId, name, role) => {
+    update: async (userId, name, role) => {
         return await User.findByIdAndUpdate(
-            userId, { name, role }, { new: true, runValidators: true }
-        ).select("-password");
+            userId,
+            { name, role },
+            { new: true }
+        );
     },
 
-    // DELETE USER
-    delete: async(userId) => {
+    delete: async (userId) => {
         return await User.findByIdAndDelete(userId);
     },
 
-    // GET USERS BY ADMIN
-    getUsersByAdminId: async(adminId) => {
-        return await User.find({ adminId }).select("-password");
+    getUsersByAdminId: async (adminId) => {
+        return await User.find({ adminId });
     }
-};
+}
 
 module.exports = rbacDao;
